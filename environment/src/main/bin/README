@@ -1,0 +1,25 @@
+This directory is mapped (filtered) to: <Project home>/bin
+
+Place here your additional scripts. Files having .sh,.pl and .py extensions will be automatically chmoded +x.
+
+You can place here you custom Service startup scripts, eventually overriding any distribution file, 
+but this is not normally needed and is otherwise not suggested (being unsupported by Release team)
+apart from deploying custom services.
+
+Following cases are supported (via relevant skel script):
+
+- nginx:               create here a custom nginx startup script (overriding default)
+                       with name nginx.sh
+- memcached:           create here a custom memcached startup script (overriding default)
+                       with name memcached.sh
+- spawn-fcgi:          create here a custom fcgi respawning script (overriding default)
+                       with name spawn-fcgi.sh
+- sphinx:              create here a custom sphinx startup script (overriding default)
+                       with name sphinx.sh
+- postfix:             create here a custom postfix startup script (overriding default)
+                       with name postfix.sh
+- rabbitmq-server:     create here a custom postfix startup script (overriding default)
+                       with name rabbitmq-server.sh
+- openresty:           create here a custom openresty startup script (overriding default)
+                       with name openresty.sh
+- generic daemon:      create here a generic service startup script with name daemon.sh

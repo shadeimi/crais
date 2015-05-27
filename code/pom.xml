@@ -1,0 +1,37 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.buongiorno.pti.bundles.code</groupId>
+        <artifactId>code-base</artifactId>
+        <version>1.0.25</version>
+    </parent>
+
+    <properties>
+        <code.build.args/>
+        <code.build.packages>centos-release-SCL python27 python27-python-setuptools libxml2-devel libusb libxslt-devel zlib-devel libjpeg-devel freetype-devel openldap-devel memcached</code.build.packages>
+        <code.build.script>scl enable python27 python-build.sh</code.build.script>
+        <code.build.profile>epel-6-x86_64</code.build.profile>
+        <pip.command>pip==1.5.6</pip.command>
+        <python.build.prepare>easy_install ${pip.command} ${easyinstall.options}</python.build.prepare>
+        <pip.options>-r /builddir/requirements.txt --process-dependency-links --allow-all-external --no-deps</pip.options>
+		<code.build.yum.repos>python-rh6,rhel-x86_64-server-optional-6,rhel-x86_64-server-supplementary-6</code.build.yum.repos>
+    	<code.build.os.version>6.5</code.build.os.version>
+    </properties>
+
+    <groupId>com.buongiorno.pti</groupId>
+    <artifactId>ptiqa-crais-app</artifactId>
+    <version>0.1-SNAPSHOT</version>
+
+    <packaging>pom</packaging>
+    <name>B! Selenium device node generator</name>
+    <description>
+        ${my.businessline} ${my.country} ${my.project} ${my.component} static
+    </description>
+   <scm>
+       <connection>scm:git:ssh://git.buongiorno.com:29418/qa/crais</connection>
+       <developerConnection>scm:git:ssh://git.buongiorno.com:29418/qa/crais</developerConnection>
+       <url>http://git.buongiorno.com/plugins/gitblit-plugin/summary/?r=qa/crais</url>
+     <tag>HEAD</tag>
+  </scm>
+</project>

@@ -1,0 +1,12 @@
+# profile for Pre Production
+
+crais.root=${static.service.home}
+crais.address=crais.preprod.buongiorno.com
+crais.nsport=8080
+crais.selenium.grid = http://selenium.preprod.buongiorno.com:4444/wd/hub
+crais.selenium.grid.host = selenium.preprod.buongiorno.com
+
+
+adb.bin=/jhub/_prod/server_ptiqaaeryn_appium_daemon/addons/sdk-bundle-linux-x86_64-zip/platform-tools/adb
+appium.bin=/jhub/_prod/server_ptiqaaeryn_appium_daemon/bin/appium.js
+

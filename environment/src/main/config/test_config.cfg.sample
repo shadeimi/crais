@@ -1,0 +1,46 @@
+
+# Grid configuration file, must be adapted to
+# deploy procedures using velocity rendering
+
+[mainConfiguration]
+
+    [[craisConfiguration]]
+    "ns_address" = "localhost"
+    "ns_port" = 9090
+
+    [[adbConfiguration]]
+    "adbPath" = "/home/shadeimi/Software/android-sdk-linux/platform-tools/adb"
+    
+    [[iDeviceConfiguration]]
+    "imdInfoBinPath" = "/usr/local/Cellar/libimobiledevice/1.2.0/bin/ideviceinfo"
+    "iwdpBinPath" = "/Users/shadeimi/git/ios-webkit-debug-proxy/src/ios_webkit_debug_proxy"
+    "ideviceinstallerPath" = "/usr/local/bin/"
+    
+    [[appiumConfiguration]]
+    "nodePath" = "/usr/bin/node"
+    "nodeSCL" = "False"
+    "appiumPath" = "/home/shadeimi/git/appium_v1.2.2/bin/appium.js"
+    "appiumProfile" = "/home/shadeimi/eclipseWorkspace/crais/code/tests/profile.sh"
+    "appiumHost" = "localhost"
+
+    [[gridConfiguration]]
+    
+        [[[base_configuration]]]
+		    "cleanUpCycle" = 2000
+		    "timeout" = 30000
+		    "proxy" = "org.openqa.grid.selenium.proxy.DefaultRemoteProxy"
+		    "url" = "http://localhost:4444/wd/hub"
+		    "host" = "localhost"
+		    "port" = 4723 	# must be overwritten
+		    "maxSession" = 1
+		    "registerCycle" = 5000
+		    "hubPort" = 4444
+		    "hubHost" = "localhost"
+		    
+		[[[node_configuration]]]
+			"browserName" = "chrome"
+			"id" = ""
+			"maxInstances" = 1
+			"platform" = "ANDROID"
+			"version" = ""
+			

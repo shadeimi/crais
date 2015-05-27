@@ -1,0 +1,12 @@
+# profile for Devel
+
+crais.root=${static.service.home}
+crais.address=crais.dev.buongiorno.com
+crais.nsport=8080
+crais.selenium.grid.url = http://${crais.selenium.grid.host}:${crais.selenium.grid.host}/wd/hub
+crais.selenium.grid.host = selenium.dev.buongiorno.com
+crais.selenium.grid.port = 4444
+
+adb.bin=/jhub/_prod/server_ptiqaaeryn_appium_daemon/addons/sdk-bundle-linux-x86_64-zip/platform-tools/adb
+appium.bin=/jhub/_prod/server_ptiqaaeryn_appium_daemon/bin/appium.js
+

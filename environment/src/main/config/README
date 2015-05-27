@@ -1,0 +1,98 @@
+This directory is mapped (filtered) to <Project home>/${static.config.dir} (default conf/)
+
+The copy is recursive.
+
+Place here you configuration files:
+
+Special treatment (via proper skelethon scripts) is applied to particular files. More in details:
+
+SKELETHON                            ACTION
+
+apache:
+httpd.conf                          -> linked under /etc/httpd/conf.d/<servicename>.conf
+
+cron:
+crontab                             -> linked under /etc/cron.d/<servicename> (main crontab job file)
+crond                               -> linked under /etc/sysconfig/crond
+
+memcached:
+memcached_<instancenum>             -> linked under /etc/sysconfig/memcached_<instancenum>
+
+nginx:
+nginx                               -> linked under /etc/sysconfig/nginx
+spawn-fcgi                          -> linked under /etc/sysconfig/spawn-fcgi (nginx-fcgi coupled respawn scenario)
+
+nginx2:
+nginx                               -> linked under /etc/sysconfig/nginx
+nginx-vhost.conf                    -> linked under /etc/nginx/conf.d/${static.service.name}.conf
+spawn-fcgi                          -> linked under /etc/sysconfig/spawn-fcgi (nginx-fcgi coupled respawn scenario)
+
+spawn-fcgi:
+spawn-fcgi                          -> linked under /etc/sysconfig/spawn-fcgi (fcgi decoupled respawn scenario) 
+
+sphinx:
+sphinx.conf                         -> linked under /etc/sphinx/sphinx.conf                              
+
+rabbitmq:
+rabbitmq-env.conf                   -> linked under /etc/rabbitmq/rabbitmq-env.conf                              
+
+openresty:
+openresty                           -> linked under /etc/sysconfig/ngx_openresty
+openresty-vhost.conf                -> linked under /opt/ngx_openresty/nginx/conf/conf.d/${static.service.name}.conf
+spawn-fcgi                          -> linked under /etc/sysconfig/spawn-fcgi (openresty-fcgi coupled respawn scenario)
+
+===================
+LOGROTATE
+===================
+To add standard logrotation through logrotate, create a file named logrotate with content:
+
+--------cut here--------
+${static.service.logs}/*log {
+         ${static.service.logrotate.options.default}
+         postrotate
+
+         ${static.service.logrotate.postrotate}
+
+         endscript
+}
+
+${static.service.logs}/${static.service.oldlogs.dir}/*.bz2 {
+    weekly
+    rotate 1
+    nodateext
+    nocreate
+    missingok
+    sharedscripts
+    nocompress
+    postrotate
+        mkdir -p ${static.storage.logs}/`date +%Y-%m`/`hostname`/${static.service.name};
+        if [ $(ls ${static.service.logs}/${static.service.oldlogs.dir}/*.bz2.1 2> /dev/null | wc -l) != 0 ];
+        then
+            mv ${static.service.logs}/${static.service.oldlogs.dir}/*.bz2.1 ${static.storage.logs}/`date +%Y-%m`/`hostname`/${static.service.name}/
+        fi
+    endscript
+}
+
+${static.service.home}/storage/cdr/copied/*.cdr {
+    weekly
+    rotate 1
+    nodateext
+    nocreate
+    missingok
+    sharedscripts
+    compress
+    postrotate
+        mkdir -p ${static.storage.logs}/`date +%Y-%m`/`hostname`/${static.service.name}/cdr;
+        if [ $(ls ${static.service.home}/storage/cdr/copied/*.1.gz 2> /dev/null | wc -l) != 0 ];
+        then
+            mv ${static.service.home}/storage/cdr/copied/*.1.gz ${static.storage.logs}/`date +%Y-%m`/`hostname`/${static.service.name}/cdr/
+        fi
+    endscript
+}
+--------cut here--------
+you may optionally change this file reusing appropriate content as well as tweak following properties in main pom:
+
+    <static.storage.logs>/logs/storage</static.storage.logs>
+    <static.service.oldlogs.dir>oldlog</static.service.oldlogs.dir>
+    <static.service.logrotate.cmd>/sbin/service ${static.service.name}</static.service.logrotate.cmd>
+    <static.service.logrotate.cmd.action>restart</static.service.logrotate.cmd.action>
