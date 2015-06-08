@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 import time
 from functools import wraps
 import threading
+from threading import Thread
 
 import libusb1
 import os, re
@@ -41,12 +42,14 @@ from subprocess32 import Popen, PIPE, STDOUT
 import errno
 from socket import error as socket_error
 from process import ProcessManager
+from port import PortManager
 import psutil, urllib2, json
 import string
 import random
 import signal
 import socket 
 
+pl = PortManager()
 
 class ADBExtender(ADB):
     
@@ -150,6 +153,8 @@ class HotplugManager(threading.Thread):
                 print traceback.format_exc()
                 
             del self.root.devices[key]
+            global pl
+            pl.decrement()
             transaction.commit()
                 
 
@@ -226,6 +231,20 @@ class HotplugManager(threading.Thread):
             pass
 
 
+class ThreadWithReturnValue(threading.Thread):
+    def __init__(self, group=None, target=None, name=None,
+                 args=(), kwargs={}, Verbose=None):
+        Thread.__init__(self, group, target, name, args, kwargs, Verbose)
+        self._return = None
+    def run(self):
+        if self._Thread__target is not None:
+            self._return = self._Thread__target(*self._Thread__args,
+                                                **self._Thread__kwargs)
+    def join(self):
+        Thread.join(self)
+        return self._return    
+    
+
 class AppiumManager(threading.Thread):
     _instance = None
 
@@ -246,20 +265,32 @@ class AppiumManager(threading.Thread):
         self.idvInstallerPath = self.conf['mainConfiguration']['iDeviceConfiguration']['ideviceinstallerPath']
         self.thread = threading.Thread.__init__(self)
         self.lock = lock
+        
         self.storage = ZODB.DB(None)
         self.connection = self.storage.open()
         self.root = self.connection.root
         self.root.processList = BTrees.OOBTree.BTree()
+        
+        self.portStorage = ZODB.DB(None)
+        self.portConnection = self.portStorage.open()
+        self.portRoot = self.portConnection.root
+        self.portRoot.portList = BTrees.OOBTree.BTree()
 
     def spawn_server(self, deviceID, deviceType):
-        def android_spawn_server(deviceID, port):
+        
+        def increment_port():
+            global pl
+            pl.increment()
+            return pl.get()
+
+        def android_spawn_server(deviceID, portValues):
             try:
                 self.lock.acquire()
                 pm = ProcessManager()
-                script = self._create_appium_bash_script(deviceID, port)
+                script = self._create_appium_bash_script(deviceID, portValues['appiumPort'], portValues['chromedriverPort'], portValues['bootstrapPort'])
                 proc = subprocess32.Popen(script, shell=True)
                 print "Bootstrapping Appium instance with PID: %s" % proc.pid
-                pm.store((proc.pid,), (port,))
+                pm.store((proc.pid,), (portValues['appiumPort'],))
                 self.root.processList[deviceID.get_capabilities()['capabilities']['id']] = pm
                 transaction.commit()
                 self.lock.release()
@@ -269,22 +300,22 @@ class AppiumManager(threading.Thread):
 
             return proc.pid
         
-        def apple_spawn_server(deviceID, appium_port, iwdp_port):
+        def apple_spawn_server(deviceID, portValues):
             try:
                 self.lock.acquire()
                 pm = ProcessManager()
                 
-                iwdp_script = self._create_iwdp_bash_script(deviceID, iwdp_port)
+                iwdp_script = self._create_iwdp_bash_script(deviceID, portValues['iwdpPort'])
                 with open(os.devnull, "w") as fnull:
                     iwdp_proc = subprocess32.Popen(iwdp_script, shell=True, stdout = fnull, stderr = fnull)
                     
                 print "Bootstrapping iOS Webkit Debug Proxy instance with PID: %s" % iwdp_proc.pid
                 
-                appium_script = self._create_appium_bash_script(deviceID, appium_port)
+                appium_script = self._create_appium_bash_script(deviceID, portValues['appiumPort'], portValues['chromedriverPort'], portValues['bootstrapPort'])
                 appium_proc = subprocess32.Popen(appium_script, shell=True)
                 print "Bootstrapping Appium instance with PID: %s" % appium_proc.pid
                 
-                pm.store((iwdp_proc.pid, appium_proc.pid,), (appium_port, iwdp_port,))
+                pm.store((iwdp_proc.pid, appium_proc.pid,), (portValues['appiumPort'], portValues['iwdpPort'],))
                 self.root.processList[deviceID.get_capabilities()['capabilities']['id']] = pm
                 transaction.commit()
                 self.lock.release()
@@ -294,51 +325,32 @@ class AppiumManager(threading.Thread):
 
             return (iwdp_proc.pid, appium_proc.pid,)
         
-        port = self._generate_free_port(host=self.appium_config["appiumHost"], portRange=range(4736,4783))
+        portThread = ThreadWithReturnValue(target=increment_port)
+        portThread.start()
+        portValues = portThread.join()
         
         if deviceType == 1: #Android
-            thread = threading.Thread(target=android_spawn_server, args=(deviceID, port,))
-            thread.start()
+            thread = ThreadWithReturnValue(target=android_spawn_server, args=(deviceID, portValues, ))
+            thread.start() 
             
         elif deviceType == 2: #Apple
-            iwdp_port = self._generate_free_port(host=self.appium_config["appiumHost"], portRange=range(27753,27760))
-            thread = threading.Thread(target=apple_spawn_server, args=(deviceID, port, iwdp_port,))
+            thread = ThreadWithReturnValue(target=apple_spawn_server, args=(deviceID, portValues,))
             thread.start()
 
-
-    def _generate_free_port(self, host, portRange):
-        p = None
-        try:
-            for port in set(portRange):
-                p = port
-                if not ProcessManager().get_process_port(port):
-                    sock = socket.socket(AF_INET, SOCK_STREAM)
-                    result = sock.connect((gethostbyname(host), port))
-                    sock.close()
-        except socket_error as serr:
-            sock.close()
-            return port
-
-            if serr.errno != errno.ECONNREFUSED:
-                raise serr
-            # connection refused handle here
-
-    def _create_appium_bash_script(self, deviceID, port):
-        chromedriver_incremental =  4780
-        bootstrap_port_incremental = 2485
+    def _create_appium_bash_script(self, deviceID, appiumPort, chromedriverPort, bootstrapPort):
         cmd_output_path = tempfile.NamedTemporaryFile(delete=False)
         cmd_file_name = cmd_output_path.name
         cmd_output_path.write("#!/bin/bash\n")
         cmd_output_path.write("source %s\n" % self.appium_config["appiumProfile"])
-        cmd_tempfile = self._generate_nodejson_file(deviceID, port)
+        cmd_tempfile = self._generate_nodejson_file(deviceID, appiumPort)
         android_udid = deviceID.get_capabilities()['capabilities']['udid']
         if self.appium_config["nodeSCL"] == "True":
             cmd_output_path.write("%s '%s -U %s -bp %s --port %s  --chromedriver-port %s --nodeconfig %s --address %s --log-timestamp --log-no-colors " % (self.appium_config["nodePath"],
-                                                                          self.appium_config["appiumPath"], android_udid, int(port) - bootstrap_port_incremental,
-                                                                          port, int(port) + chromedriver_incremental, cmd_tempfile, self.appium_config["appiumHost"]))
+                                                                          self.appium_config["appiumPath"], android_udid, bootstrapPort,
+                                                                          appiumPort, chromedriverPort, cmd_tempfile, self.appium_config["appiumHost"]))
         else:
             cmd_output_path.write("%s -U %s --port %s  --chromedriver-port %s -bp %s --nodeconfig %s --address %s --log-timestamp --log-no-colors " % (self.appium_config["appiumPath"],
-                                                                     android_udid, port, int(port) + chromedriver_incremental,  int(port) - bootstrap_port_incremental, cmd_tempfile, self.appium_config["appiumHost"]))
+                                                                     android_udid, appiumPort, chromedriverPort,  bootstrapPort, cmd_tempfile, self.appium_config["appiumHost"]))
         cmd_output_path.close()
         os.chmod(cmd_file_name, 0755)
         return cmd_file_name
