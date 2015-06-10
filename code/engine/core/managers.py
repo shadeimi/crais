@@ -139,6 +139,8 @@ class HotplugManager(threading.Thread):
                 'version': c['ProductVersion'], 'name': c['DeviceName'], 'platform': "MAC"}
         
 
+    @retry(IndexError, tries=3)
+    @retry(KeyError, tries=3)
     @retry(libusb1.LIBUSB_ERROR_ACCESS, tries=2)
     def _usb_connection(self, device, event):
         """ TODO: Manage missing udev rules """
@@ -146,15 +148,13 @@ class HotplugManager(threading.Thread):
         
         if event == 2 and self._check_device_in_ZODB(key):
             deviceKey = self.root.devices[key]
-    
-            try:        
+            try:     
+                   
                 ks = self.am.kill_server(deviceKey)       
             except Exception as e:
                 print traceback.format_exc()
                 
             del self.root.devices[key]
-            global pl
-            pl.decrement()
             transaction.commit()
                 
 
@@ -270,18 +270,12 @@ class AppiumManager(threading.Thread):
         self.connection = self.storage.open()
         self.root = self.connection.root
         self.root.processList = BTrees.OOBTree.BTree()
-        
-        self.portStorage = ZODB.DB(None)
-        self.portConnection = self.portStorage.open()
-        self.portRoot = self.portConnection.root
-        self.portRoot.portList = BTrees.OOBTree.BTree()
 
     def spawn_server(self, deviceID, deviceType):
         
-        def increment_port():
+        def get_port():
             global pl
-            pl.increment()
-            return pl.get()
+            return pl.pop()
 
         def android_spawn_server(deviceID, portValues):
             try:
@@ -290,7 +284,7 @@ class AppiumManager(threading.Thread):
                 script = self._create_appium_bash_script(deviceID, portValues['appiumPort'], portValues['chromedriverPort'], portValues['bootstrapPort'])
                 proc = subprocess32.Popen(script, shell=True)
                 print "Bootstrapping Appium instance with PID: %s" % proc.pid
-                pm.store((proc.pid,), (portValues['appiumPort'],))
+                pm.store((proc.pid,), (portValues['appiumPort'],), portValues)
                 self.root.processList[deviceID.get_capabilities()['capabilities']['id']] = pm
                 transaction.commit()
                 self.lock.release()
@@ -315,7 +309,7 @@ class AppiumManager(threading.Thread):
                 appium_proc = subprocess32.Popen(appium_script, shell=True)
                 print "Bootstrapping Appium instance with PID: %s" % appium_proc.pid
                 
-                pm.store((iwdp_proc.pid, appium_proc.pid,), (portValues['appiumPort'], portValues['iwdpPort'],))
+                pm.store((iwdp_proc.pid, appium_proc.pid,), (portValues['appiumPort'], portValues['iwdpPort'],), portValues)
                 self.root.processList[deviceID.get_capabilities()['capabilities']['id']] = pm
                 transaction.commit()
                 self.lock.release()
@@ -325,7 +319,7 @@ class AppiumManager(threading.Thread):
 
             return (iwdp_proc.pid, appium_proc.pid,)
         
-        portThread = ThreadWithReturnValue(target=increment_port)
+        portThread = ThreadWithReturnValue(target=get_port)
         portThread.start()
         portValues = portThread.join()
         
@@ -391,6 +385,9 @@ class AppiumManager(threading.Thread):
             return False
 
     def kill_server(self, deviceID):
+        port = self.root.processList[deviceID.get_capabilities()['capabilities']['id']].get().values()[0]        
+        pl.push(self.root.processList[deviceID.get_capabilities()['capabilities']['id']].get_port_manager_element(str(port[0])))
+        
         def _kill_server(pid):
             try:
                 def on_terminate(proc):
@@ -413,9 +410,8 @@ class AppiumManager(threading.Thread):
                 return False
         
         pid = self.root.processList[deviceID.get_capabilities()['capabilities']['id']].get().keys()[0]
-        port = self.root.processList[deviceID.get_capabilities()['capabilities']['id']].get().values()[0]
         pproc = None
-        
+           
         for p in pid:
             thread = threading.Thread(target=_kill_server, args=(p, ))
             thread.start()

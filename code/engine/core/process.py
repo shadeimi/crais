@@ -22,11 +22,14 @@ import persistent
 
 
 class ProcessManager(persistent.Persistent):
+
     def __init__(self):
         self.process_list = {}
+        self.port_manager_element = {}
 
-    def store(self, pid, port):
+    def store(self, pid, port, pmelement):
         self.process_list[pid] = port
+        self.port_manager_element[str(port[0])] = pmelement
 
     def delete(self, pid):
         try:
@@ -44,6 +47,10 @@ class ProcessManager(persistent.Persistent):
         for key, value in self.process_list.iteritems():
             if value == port:
                 return key
-
+    
+    def get_port_manager_element(self, port):
+        return self.port_manager_element[port]
+    
     def get(self):
         return self.process_list
+    

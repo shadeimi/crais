@@ -23,23 +23,41 @@ import persistent
 
 class PortManager(persistent.Persistent):
     def __init__(self):
-        self.portValues = {'appiumPort': 4735, 'iwdpPort': 27752, 'chromedriverPort': 9515, 'bootstrapPort': 2250}
+        
+        def _increment(d, value):
+            incrementalValues = []
+            for index, item in enumerate(d):
+                incrementalValues.append(d[item] + value)
+                
+            d = dict(zip(d.keys(), incrementalValues))
             
-    def increment(self):
-        incrementalValues = []
-        for index, item in enumerate(self.portValues):
-            incrementalValues.append(self.portValues[item] + 1)
+            #HACK: iwdpPost is always 27753
+            d['iwdpPort'] = 27753
             
-        self.portValues = dict(zip(self.portValues.keys(), incrementalValues))
-            
+            return d
+        
+        self.items = []
+        self._portValuesBase = {'appiumPort': 4735, 'iwdpPort': 27752, 'chromedriverPort': 9515, 'bootstrapPort': 2250}
+        for i in range(1,5):
+            self.items.append(_increment(self._portValuesBase, i))     
+
+    def isEmpty(self):
+        return self.items == []
     
-    def decrement(self):
-        incrementalValues = []
-        for index, item in enumerate(self.portValues):
-            incrementalValues.append(self.portValues[item] - 1)
+    def push(self, item):
+        self.items.append(item)
+    
+    def pop(self):
+        try:
+            return self.items.pop()
+        except IndexError as e:
+            print str(e.message)
+            return {}
             
-        self.portValues = dict(zip(self.portValues.keys(), incrementalValues))
-
-
-    def get(self):
-        return self.portValues
+    def peek(self):
+        return self.items[len(self.items)-1]
+    
+    def size(self):
+        return len(self.items)
+    
+    
